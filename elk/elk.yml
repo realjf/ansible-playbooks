@@ -1,0 +1,14 @@
+---
+- hosts: elkserver
+  gather_facts: yes
+
+  var_files:
+    - vars/main.yml
+
+  roles:
+    - roles/geerlingguy.java
+    - roles/geerlingguy.nginx
+    - roles/geerlingguy.elasticsearch
+    - roles/stanley.kibana
+    - roles/geerlingguy.logstash
+    - roles/stanley.logstash-filebeat
