@@ -1,0 +1,85 @@
+<?php
+/**
+ * @file
+ * 搭建测试页面
+ *
+ */
+
+$mysql_servers = array(
+{% for host in groups['lamp-db'] %}
+ '{{ host }}',
+{% endfor %}
+);
+
+$mysql_results = array();
+foreach($mysql_servers as $host) {
+    if ($result = mysql_test_connection($host)) {
+        $mysql_results[$host] = '<span style="color: green;">PASS</span>';
+        $mysql_results[$host] .= '(' . $result['status'] . ')';
+    } else {
+        $mysql_results[$host] = '<span style="color: red;">FAIL</span>';
+    }
+}
+
+// 链接memcached
+$memcached_result = '<span style="color: red;">FAIL</span>';
+if (class_exists('Memcached')){
+    $memcached = new Memcached;
+    $memcached->addServer('{{ groups['lamp-memcached'][0] }}', 11211);
+    if ($memcached->add('test', "success", 1)) {
+        $result = $memcached->get('test');
+        if($result == 'success') {
+            $memcached_result = '<span style="color: green;">PASS</span>';
+            $memcached->delete('test');
+        }
+    }
+}
+
+
+/**
+ * 链接mysql服务器病进行测试
+ * @param string $host
+ * @return array
+ *
+ */
+function mysql_test_connection($host) {
+    $username = 'mycompany_user';
+    $password = 'secret';
+    try{
+        $db = new PDO(
+            'mysql:host=' . $host . ';dbname=mycompany_database',
+            $username,
+            $password,
+            array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION)
+        );
+
+        // 询问服务器被配置的状态master或者slave
+        $statement = $db->prepare("SELECT variable_value FROM information_schema.global_variables WHERE variable_name = 'LOG_BIN';");
+        $statement->execute();
+        $result = $statement->fetch();
+
+        return array(
+        'success' => TRUE,
+        'status' => ($result[0] == 'ON') ? 'master' : 'slave'
+        );
+    } catch(PDOException $e) {
+        return array();
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Host {{ inventory_hostname }} </title>
+    <style>* {font-family: Helvetica, Arial, sans-serif }</style>
+</head>
+<body>
+    <h1>Host {{ inventory_hostname }}</h1>
+    <?php foreach($mysql_results as $host => $result) : ?>
+    <p>MySQL Connection (<?php print $host; ?>):
+    <?php print $result; ?></p>
+    <php endforeach; ?>
+    <p>Memcached Connection: <?php print $memcached_result; ?></p>
+</body>
+</html>
